@@ -55,6 +55,12 @@ class Main:
         self.show_search = bool(Main.__settings__.getSetting("show_search").lower() == 'true')
         self.show_peers = bool(Main.__settings__.getSetting("show_peers").lower() == 'true')
         self.engine = int(Main.__settings__.getSetting("engine"))
+        if bool(Main.__settings__.getSetting("use_custom_temp_folder").lower() == 'true'):
+            self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
+            if not os.path.exists(self.temp_folder):
+                self.temp_folder = None
+        else:
+            self.temp_folder = None
         self.progress = xbmcgui.DialogProgress()
         if not os.path.exists(self.addon_data_dir):
             os.makedirs(self.addon_data_dir)
@@ -327,6 +333,8 @@ class Main:
         if 'engine' in self.params:
             self.engine = int(self.params['engine'])
         torrent = TEngine(engine_type=self.engine)
+        if self.temp_folder:
+            torrent.set_temporary_folder(self.temp_folder)
         anime_id = self.params['id']
         cover = self._get_image(anime_id=anime_id)
         if 'torrent_file_url' in self.params:

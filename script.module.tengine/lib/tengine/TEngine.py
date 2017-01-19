@@ -137,6 +137,13 @@ class TEngine:
         elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
             self.resume_saved = rs
 
+    def set_temporary_folder(self, tf):
+        if xbmcvfs.exists(tf):
+            self.torrent_file_dir = tf
+            self.torrent_store_dir = tf
+
+
+
     def is_file_playback_ended(self):
         if self.en_type == TEngine.ACESTREAM:
             if not self.engine.player:

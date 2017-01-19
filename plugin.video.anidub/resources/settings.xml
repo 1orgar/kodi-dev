@@ -12,5 +12,7 @@
   </category>
   <category label="P2P">
     <setting id="engine" type="enum" label="Torrent клиент" values="AceStream|Py2http|torrent2http" default="0" />
+    <setting id="use_custom_temp_folder" type="bool" label="Указать место хранения временных файлов" default="false" visible="!eq(-1,0)"/>
+    <setting id="custom_temp_folder" type="folder" label="Расположение" visible="!eq(-2,0)" enable="eq(-1,true)"/>
   </category>
 </settings>
