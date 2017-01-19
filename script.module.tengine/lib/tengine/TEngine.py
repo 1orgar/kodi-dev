@@ -12,6 +12,13 @@ import re
 import os
 import urlparse
 
+def debug(s):
+    pass
+    #from datetime import datetime
+    #log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'TEngine.log'), 'a')
+    #log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
+    #log.close()
+
 class TEngine:
     ACESTREAM = 0
     PY2HTTP = 1
@@ -22,12 +29,13 @@ class TEngine:
     PRELOAD_SIZE_MAX = 200 * 1024 * 1024
     PRELOAD_SIZE_FACTOR = 3
 
-    def __init__(self, file_name=None, engine_type=0, save_path=None, keep_files=False, resume_saved=False):
+    def __init__(self, file_name=None, engine_type=0, save_path=None, keep_files=False, resume_saved=False, temp_path=None):
+        debug('Initialization...')
+        debug('Engine ' + str(engine_type))
         if engine_type == TEngine.ACESTREAM:
             from ASCore import TSengine
             self.engine = TSengine()
             del TSengine
-            #self.engine.set_saving_settings(keep_files, save_path, resume_saved)
         elif engine_type == TEngine.PY2HTTP or engine_type == TEngine.T2HTTP:
             try:
                 from python_libtorrent import get_libtorrent
@@ -38,8 +46,8 @@ class TEngine:
             del libtorrent
             self.resume_saved = resume_saved if keep_files else False
             self.keep_files = keep_files
-            self.torrent_file_dir = os.path.join(xbmc.translatePath('special://temp/'), 'tengine')
-            self.torrent_store_dir = save_path if save_path else os.path.join(xbmc.translatePath('special://temp/'), 'tengine')
+            self.torrent_file_dir = temp_path if temp_path else os.path.join(xbmc.translatePath('special://temp/'), 'tengine')
+            self.torrent_store_dir = save_path if save_path else self.torrent_file_dir
             if not xbmcvfs.exists(self.torrent_file_dir):
                 xbmcvfs.mkdirs(self.torrent_file_dir)
             self.engine = None
@@ -136,13 +144,6 @@ class TEngine:
             self.engine.resume_saved = rs
         elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
             self.resume_saved = rs
-
-    def set_temporary_folder(self, tf):
-        if xbmcvfs.exists(tf):
-            self.torrent_file_dir = tf
-            self.torrent_store_dir = tf
-
-
 
     def is_file_playback_ended(self):
         if self.en_type == TEngine.ACESTREAM:

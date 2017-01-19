@@ -15,6 +15,12 @@ def fs_enc(path):
     sys_enc = sys.getfilesystemencoding() if sys.getfilesystemencoding() else 'utf-8'
     return path.decode('utf-8').encode(sys_enc)
 
+def debug(s):
+    pass
+    #from datetime import datetime
+    #log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'Tfp.log'), 'a')
+    #log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
+    #log.close()
 
 class Tfp(object):
     __plugin__ = sys.modules["__main__"].__plugin__
@@ -39,6 +45,12 @@ class Tfp(object):
         self.cu = self.c.cursor()
         self._create_tables()
         del db
+        if self.__settings__.getSetting("use_custom_temp_folder").lower() == 'true':
+            self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
+            if not os.path.exists(fs_enc(self.temp_folder)):
+                self.temp_folder = None
+        else:
+            self.temp_folder = None
         self.cont_play = True if self.__settings__.getSetting('cont_play') == 'true' else False
         self.save = True if self.__settings__.getSetting('save') == 'true' else False
         self.folder = self.__settings__.getSetting('folder') if self.save else None
@@ -86,7 +98,7 @@ class Tfp(object):
 
     def _get_contents(self, torrent_file):
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine))
+        torrent = TEngine(torrent_file, int(self.engine), temp_path=self.temp_folder)
         del TEngine
         if not self.folder or self.cont_play:
             torrent.cleanup()
@@ -116,7 +128,7 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine), self.folder, self.save, self.resume_saved)
+        torrent = TEngine(torrent_file, int(self.engine), self.folder, self.save, self.resume_saved, self.temp_folder)
         del TEngine
         if not torrent.play(index, title, 'DefaultVideo.png', self.icon, True):
             xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Playback Error", 2000, "")')
@@ -129,7 +141,7 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine))
+        torrent = TEngine(torrent_file, int(self.engine), temp_path=self.temp_folder)
         del TEngine
         play_start = False
         for file in sorted(torrent.files, key=lambda k: k['file']):

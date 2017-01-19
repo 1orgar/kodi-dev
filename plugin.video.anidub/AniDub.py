@@ -57,7 +57,7 @@ class Main:
         self.engine = int(Main.__settings__.getSetting("engine"))
         if bool(Main.__settings__.getSetting("use_custom_temp_folder").lower() == 'true'):
             self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
-            if not os.path.exists(self.temp_folder):
+            if not os.path.exists(fs_enc(self.temp_folder)):
                 self.temp_folder = None
         else:
             self.temp_folder = None
@@ -284,7 +284,7 @@ class Main:
             os.mkdir(series_dir)
             from tengine import TEngine
             torrent = TEngine(file_name=os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % anime_id),
-                             engine_type=TEngine.T2HTTP)
+                             engine_type=TEngine.T2HTTP, temp_path=self.temp_folder)
             debug(repr(torrent.enumerate_files()))
             for i in torrent.enumerate_files():
                 fl = open(os.path.join(series_dir, '%s.strm' % os.path.splitext(i['file'])[0]), 'w')
@@ -332,9 +332,7 @@ class Main:
         from tengine import TEngine
         if 'engine' in self.params:
             self.engine = int(self.params['engine'])
-        torrent = TEngine(engine_type=self.engine)
-        if self.temp_folder:
-            torrent.set_temporary_folder(self.temp_folder)
+        torrent = TEngine(engine_type=self.engine, temp_path=self.temp_folder)
         anime_id = self.params['id']
         cover = self._get_image(anime_id=anime_id)
         if 'torrent_file_url' in self.params:
