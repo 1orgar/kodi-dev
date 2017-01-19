@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+  <category label="Доступ к сайту">
+    <setting id="login" type="text" label="Логин" default="" />
+    <setting id="password" type="text" option="hidden" label="Пароль" enable="!eq(-1,)" default="" />
+  </category>
+  <category label="Интрефейс">
+    <setting id="source_quality" type="enum" label="Качество видео" values="Предлагать выбор|Максимальное качество|Максимум пиров" default="0" />
+    <setting id="show_history" type="bool" label="Показывать историю просмотров" default="false" />
+    <setting id="show_search" type="bool" label="Показывать поиск" default="true" />
+    <setting id="show_peers" type="bool" label="Показывать пиров в названии файлов" default="false" />
+  </category>
+  <category label="P2P">
+    <setting id="engine" type="enum" label="Torrent клиент" values="AceStream|Py2http|torrent2http" default="0" />
+  </category>
+</settings>
