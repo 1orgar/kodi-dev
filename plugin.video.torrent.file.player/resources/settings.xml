@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings>
+  <category label="Настройки">
+    <setting id="engine" type="enum" label="Torrent клиент" values="AceStream|Py2http|torrent2http" default="0" />
+	<setting id="save" type="bool" label="Сохранять скаченное на диск" default="false" />
+    <setting id="folder" type="folder" label="Путь для сохранения" enable="eq(-1,true)" />
+    <setting id="switch_playback" type="bool" label="Переключаться на локальный файл" default="false" enable="eq(-2,true)" />
+    <setting id="cont_play" type="bool" label="Непрерывное воспроизведение" default="false" enable="true" />
+  </category>
+</settings>
