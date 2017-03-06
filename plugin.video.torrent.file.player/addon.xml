@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon id="plugin.video.torrent.file.player"
        name="Torrent file player"
-       version="0.4.3.1"
+       version="0.4.3.2"
        provider-name="1orgar">
   <requires>
-      <import addon="xbmc.python" version="2.7.8"/>
+      <import addon="xbmc.python" version="2.7.13"/>
       <import addon="script.module.tengine"/>
   </requires>
   <extension point="xbmc.python.pluginsource" library="default.py">

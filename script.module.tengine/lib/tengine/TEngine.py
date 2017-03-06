@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# version 1.3
+# version 1.4.6
 
 import sys
 import xbmc
@@ -91,19 +91,19 @@ class TEngine:
                     for k, v in self.engine.files.iteritems():
                         self.files.append({"index": int(v), "file": k, 'size': 0})
             elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
-                e = self.lt.bdecode(content)
-                fls = self.lt.torrent_info(e)
+                fls = self.lt.torrent_info(self.lt.bdecode(content))
                 for c_id, c_fl in enumerate(fls.files()):
                     if self.re_fl_ext.search(c_fl.path):
                         if self.re_fl_ext.search(c_fl.path).group(1)[1:] in TEngine.VIDEO_FILE_EXT:
                             self.files.append({'index': int(c_id), 'file': self.re_path2fl.sub('', c_fl.path),
                                                'size': c_fl.size})
                 self.torrent_file = os.path.join(self.torrent_file_dir, self.re_path2fl.sub('', file_name))
-                fl_s = xbmcvfs.File(file_name, 'rb')
-                fl_d = xbmcvfs.File(self.torrent_file, 'wb')
-                fl_d.write(fl_s.read())
-                fl_d.close()
-                fl_s.close()
+                if file_name != self.torrent_file:
+                    fl_s = xbmcvfs.File(file_name, 'rb')
+                    fl_d = xbmcvfs.File(self.torrent_file, 'wb')
+                    fl_d.write(fl_s.read())
+                    fl_d.close()
+                    fl_s.close()
                 dht_routers = ["router.bittorrent.com:6881", "router.utorrent.com:6881"]
                 user_agent = 'uTorrent/2200(24683)'
                 if self.en_type == TEngine.PY2HTTP:
