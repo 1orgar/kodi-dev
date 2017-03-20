@@ -5,6 +5,7 @@ import urllib
 import urllib2
 import cookielib
 import xbmc
+from debug import CDebug
 
 
 class Url:
@@ -31,6 +32,7 @@ class Url:
         self.cb_auth_ok = None
         self.download_dir = None
         self.show_errors = True
+        self.log = CDebug(prefix='URL')
 
     def get(self, target, referer='', post=None):
         Url.headers['Referer'] = referer
@@ -42,6 +44,7 @@ class Url:
             data = url.read()
             return data
         except Exception, e:
+            self.log(target + ' ' + e)
             if self.show_errors:
                 xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
             return None
@@ -61,10 +64,22 @@ class Url:
             fl.write(url.read())
             fl.close()
             return os.path.join(self.download_dir, dest_name)
-        except Exception, e:
-            if self.show_errors:
-                xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
-            return None
+        except urllib2.HTTPError, e:
+            if int(e.getcode()) == 503:
+                from cfscrape import CloudflareScraper
+                scraper = CloudflareScraper()
+                self.log('Loading CF protected image %s > %s' % (target, dest_name))
+                fl = open(os.path.join(self.download_dir, dest_name), "wb")
+                c = scraper.get(target).content
+                fl.write(c)
+                fl.close()
+                return os.path.join(self.download_dir, dest_name)
+            else:
+                self.log(target + ' ' + e)
+                if self.show_errors:
+                    xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
+                return None
+
 
     def auth_try(self):
         if not self.use_auth or self.sid_file == '' or self.auth_url == '':

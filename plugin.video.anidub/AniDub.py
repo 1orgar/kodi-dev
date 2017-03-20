@@ -8,7 +8,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 import urlparse
-
+from debug import CDebug
 
 def mkreq(params):
     return '%s?%s' % (sys.argv[0], urllib.urlencode(params))
@@ -26,14 +26,6 @@ def fs_enc(path):
 def fs_dec(path):
     sys_enc = sys.getfilesystemencoding() if sys.getfilesystemencoding() else 'utf-8'
     return path.decode(sys_enc).encode('utf-8')
-
-
-def debug(s):
-    pass
-    #from datetime import datetime
-    #log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'AniDUB.log'), 'a')
-    #log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
-    #log.close()
 
 
 class Main:
@@ -61,6 +53,8 @@ class Main:
                 self.temp_folder = None
         else:
             self.temp_folder = None
+        self.log = CDebug('AniDUB.log', 'MAIN')
+        self.log('Initialization')
         self.progress = xbmcgui.DialogProgress()
         if not os.path.exists(self.addon_data_dir):
             os.makedirs(self.addon_data_dir)
@@ -91,6 +85,7 @@ class Main:
             if not self.url.auth_try():
                 self.params['mode'] = 'check_settings'
                 show_message('Ошибка', 'Проверьте логин и пароль')
+                self.log('Wrong authentication credentials')
                 return
         self.res_list = ['bd1080', 'tv1080', 'bd720', 'tv720', 'dvd720', 'dvd480', 'hwp', 'psp', '']
         from AnimeDB import AnimeDB
@@ -144,7 +139,7 @@ class Main:
             for fl in os.listdir(self.images_dir):
                 if fs_enc(str(anime_id)) in fl:
                     return fs_dec(os.path.join(self.images_dir, fl))
-            return ''
+            return self.icon
         else:
             fl = fs_enc('%d.%s' % (int(anime_id), os.path.basename(url).rsplit('.')[1]))
             if fl in os.listdir(self.images_dir):
@@ -160,7 +155,7 @@ class Main:
             return '%s%s/page/%d/' % (Main.site_url, self.params['param'], int(self.params['page']))
 
     def execute(self):
-        debug(sys.argv[2])
+        self.log('mode: ' + self.params['mode'])
         getattr(self, 'f_' + self.params['mode'])()
         self.end()
 
@@ -211,7 +206,8 @@ class Main:
             query = r'dlenewssortby=rating&dledirection=desc&set_new_sort=dle_sort_main&set_direction_sort=dle_direction_main'
             self.common_parser('%s/page/%d/' % (Main.site_url, int(self.params['page'])), query)
         elif self.params['param'] == 'year':
-            for i in range(2016, 1994, -1):
+            import datetime
+            for i in range(int(datetime.datetime.now().year), 1994, -1):
                 self._create_li(title='%d' % i, params={'mode': 'subcategory', 'param': 'xfsearch/%d' % i},
                                 art={'icon': 'DefaultFolder.png', 'fanart': self.fanart})
         elif self.params['param'] == 'genre':
@@ -285,7 +281,6 @@ class Main:
             from tengine import TEngine
             torrent = TEngine(file_name=os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % anime_id),
                              engine_type=TEngine.T2HTTP, temp_path=self.temp_folder)
-            debug(repr(torrent.enumerate_files()))
             for i in torrent.enumerate_files():
                 fl = open(os.path.join(series_dir, '%s.strm' % os.path.splitext(i['file'])[0]), 'w')
                 fl.write(mkreq({'mode': 'play_torrent', 'param': 'query_info', 'index': int(i['index']), 'id': int(anime_id)}))
@@ -542,13 +537,13 @@ class Main:
         self.progress.update(10, "Поиск...", s)
         searches = soup.find_all('div', class_="search_post")
         i = 20
-        for s in searches:
+        for sr in searches:
             if xbmc.abortRequested or self.progress.iscanceled():
                 return
             i += 5
-            anime_id = self._get_id_from_url(s.h2.a.get('href'))
-            cover = self._get_image(anime_id, s.div.img.get('src'))
-            title = s.h2.a.get_text()
+            anime_id = self._get_id_from_url(sr.h2.a.get('href'))
+            cover = self._get_image(anime_id, sr.div.img.get('src'))
+            title = sr.h2.a.get_text()
             self.progress.update(i, "Идет загрузка данных", ' ')
             self._create_li_from_id(anime_id, title, cover)
         self.progress.close()
