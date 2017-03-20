@@ -353,7 +353,7 @@ class Main:
         else:
             torrent.load_file(os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % int(self.params['id'])))
             title = filter(lambda x: x['index'] == int(self.params['index']), torrent.enumerate_files())[0]['file']
-            debug('TITLE: %s' % title)
+            self.log('Title: %s' % title)
             self.DB.viewed_episode_add(anime_id=anime_id, file_name=title)
             torrent.play(int(self.params['index']), title, 'DefaultVideo.png', cover,
                          False if 'engine' in self.params else True)
