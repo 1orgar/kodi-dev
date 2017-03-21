@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings>
-  <category label="Common">
-    <setting type="sep"/>
-  </category>
+  <setting id="engine" type="enum" label="Torrent клиент" values="AceStream|Py2http|torrent2http" default="0" />
+  <setting id="use_custom_temp_path" type="bool" label="Указать место хранения временных файлов" default="false" visible="!eq(-1,0)"/>
+  <setting id="temp_path" type="folder" label="Расположение" visible="!eq(-2,0)" enable="eq(-1,true)"/>
+  <setting type="sep" visible="!eq(-3,0)"/>
+  <setting id="save_files" type="bool" label="Сохранять скаченное на диск" default="false" />
+  <setting id="save_path" type="folder" label="Путь для сохранения" visible="eq(-1,true)" />
+  <setting id="switch_playback" type="bool" label="Переключаться на локальный файл" default="false" visible="eq(-2,true)" />
 </settings>

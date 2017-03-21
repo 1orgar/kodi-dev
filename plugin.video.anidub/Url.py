@@ -5,7 +5,6 @@ import urllib
 import urllib2
 import cookielib
 import xbmc
-from debug import CDebug
 
 
 class Url:
@@ -18,6 +17,10 @@ class Url:
     }
 
     def __init__(self, use_auth=False, auth_state=False):
+        from debug import CDebug
+        self.log = CDebug(prefix='URL')
+        del CDebug
+        self.log('Initialization')
         self.use_auth = use_auth
         if self.use_auth:
             self.cj = cookielib.MozillaCookieJar()
@@ -32,7 +35,6 @@ class Url:
         self.cb_auth_ok = None
         self.download_dir = None
         self.show_errors = True
-        self.log = CDebug(prefix='URL')
 
     def get(self, target, referer='', post=None):
         Url.headers['Referer'] = referer
@@ -44,9 +46,9 @@ class Url:
             data = url.read()
             return data
         except Exception, e:
-            self.log(target + ' ' + e)
             if self.show_errors:
                 xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
+            self.log(target + ' ' + e)
             return None
 
     def download_file(self, target, referer='', post=None, dest_name=None):
@@ -66,19 +68,21 @@ class Url:
             return os.path.join(self.download_dir, dest_name)
         except urllib2.HTTPError, e:
             if int(e.getcode()) == 503:
-                from cfscrape import CloudflareScraper
-                scraper = CloudflareScraper()
-                self.log('Loading CF protected image %s > %s' % (target, dest_name))
-                fl = open(os.path.join(self.download_dir, dest_name), "wb")
-                c = scraper.get(target).content
-                fl.write(c)
-                fl.close()
-                return os.path.join(self.download_dir, dest_name)
-            else:
-                self.log(target + ' ' + e)
-                if self.show_errors:
-                    xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
-                return None
+                try:
+                    from cfscrape import CloudflareScraper
+                    scraper = CloudflareScraper()
+                    self.log('Loading CF protected image %s > %s' % (target, dest_name))
+                    fl = open(os.path.join(self.download_dir, dest_name), "wb")
+                    c = scraper.get(target).content
+                    fl.write(c)
+                    fl.close()
+                    return os.path.join(self.download_dir, dest_name)
+                except Exception:
+                    pass
+            if self.show_errors:
+                xbmc.executebuiltin('XBMC.Notification("HTTP_ERROR", "%s", 3000, "")' % e)
+            self.log(target + ' ' + e)
+            return None
 
 
     def auth_try(self):

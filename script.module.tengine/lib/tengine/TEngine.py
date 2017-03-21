@@ -6,18 +6,13 @@ import xbmc
 import xbmcvfs
 import xbmcgui
 import xbmcplugin
+import xbmcaddon
 import urllib
 import base64
 import re
 import os
 import urlparse
 
-def debug(s):
-    pass
-    #from datetime import datetime
-    #log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'TEngine.log'), 'a')
-    #log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
-    #log.close()
 
 class TEngine:
     ACESTREAM = 0
@@ -29,45 +24,97 @@ class TEngine:
     PRELOAD_SIZE_MAX = 200 * 1024 * 1024
     PRELOAD_SIZE_FACTOR = 3
 
-    def __init__(self, file_name=None, engine_type=0, save_path=None, keep_files=False, resume_saved=False, temp_path=None):
-        debug('Initialization...')
-        debug('Engine ' + str(engine_type))
-        if engine_type == TEngine.ACESTREAM:
+    __settings__ = xbmcaddon.Addon(id='script.module.tengine')
+
+    def __init__(self, **kwargs):
+        from debug import CDebug
+        self.log = CDebug(filename='TEngine.log', prefix='TENGINE')
+        del CDebug
+        self.log('Initialization')
+
+        self._file_name = None
+        self._engine = None
+        self._player = None
+        self._status = ''
+        self._files = list()
+        self._re_path2fl = re.compile(r'(^.+\\)|(^.+\/)')
+        self._re_fl_ext = re.compile(r'.+(\..+)$')
+
+        self._engine_type = int(TEngine.__settings__.getSetting('engine'))
+        self._temp_path = TEngine.__settings__.getSetting('temp_path') if TEngine.__settings__.getSetting('use_custom_temp_path') == 'true' else None
+        self._save_path = TEngine.__settings__.getSetting('save_path') if TEngine.__settings__.getSetting('save_files') == 'true' else None
+        self._resume_saved = TEngine.__settings__.getSetting('switch_playback') == 'true'
+
+        for k in ('file_name', 'engine_type', 'save_path', 'resume_saved', 'temp_path'):
+            if k in kwargs:
+                setattr(self, '_' + k, kwargs[k])
+
+        if self._engine_type != TEngine.ACESTREAM and self._engine_type != TEngine.PY2HTTP and self._engine_type != TEngine.T2HTTP:
+            self._engine_type = TEngine.ACESTREAM
+            self.log('Using AceStream as default engine')
+
+        if self._temp_path:
+            if not os.path.exists(fs_enc(self._temp_path)):
+                self._temp_path = None
+                self.log('Temp folder is not found using system default')
+            elif not self._write_check(fs_enc(self._temp_path)):
+                self._temp_path = None
+                self.log('Temp folder is write protected using system default')
+        if not self._temp_path:
+            self._temp_path = os.path.join(xbmc.translatePath('special://temp/'), 'tengine')
+            if not os.path.exists(fs_enc(self._temp_path)):
+                os.makedirs(fs_enc(self._temp_path))
+                self.log('Creating folder: ' + self._temp_path)
+            if not self._write_check(fs_enc(self._temp_path)):
+                raise Exception('System temp path is unavailible: %s' % self._temp_path)
+        self.log('Using temp folder: %s' % self._temp_path)
+
+        if self._save_path:
+            if not os.path.exists(fs_enc(self._save_path)):
+                self._save_path = None
+                self.log('Storage folder is not found, streaming only')
+            elif not self._write_check(fs_enc(self._save_path)):
+                self._save_path = None
+                self.log('Storage folder is write protected, streaming only')
+            else:
+                self.log('Using storage folder: %s' % self._save_path)
+        if not self._save_path:
+            self._resume_saved = False
+
+        if self._engine_type == TEngine.ACESTREAM:
             from ASCore import TSengine
-            self.engine = TSengine()
+            self._engine = TSengine()
             del TSengine
-        elif engine_type == TEngine.PY2HTTP or engine_type == TEngine.T2HTTP:
+        elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
             try:
                 from python_libtorrent import get_libtorrent
                 libtorrent = get_libtorrent()
             except:
                 import libtorrent
-            self.lt = libtorrent
+            self._lt = libtorrent
             del libtorrent
-            self.resume_saved = resume_saved if keep_files else False
-            self.keep_files = keep_files
-            self.torrent_file_dir = temp_path if temp_path else os.path.join(xbmc.translatePath('special://temp/'), 'tengine')
-            self.torrent_store_dir = save_path if save_path else self.torrent_file_dir
-            if not xbmcvfs.exists(self.torrent_file_dir):
-                xbmcvfs.mkdirs(self.torrent_file_dir)
-            self.engine = None
-            self.player = None
-        self.torrent_file = file_name
-        self.status = ''
-        self.en_type = engine_type
-        self.files = list()
-        self.re_path2fl = re.compile(r'(^.+\\)|(^.+\/)')
-        self.re_fl_ext = re.compile(r'.+(\..+)$')
-        if file_name:
-            self.load_file(file_name)
+        if self._file_name:
+            self.load_file(self._file_name)
 
     def __del__(self):
+        self.log('Shutting down')
         self.end()
+
+    def _write_check(self, folder):
+        try:
+            test_file = os.path.join(folder, '.test')
+            fl = open(test_file, 'w')
+            fl.close()
+            os.remove(test_file)
+            return True
+        except IOError:
+            return False
 
     def cleanup(self):
         import shutil
         try:
-            for root, dirs, files in os.walk(fs_enc(self.torrent_file_dir)):
+            self.log('Cleaning up')
+            for root, dirs, files in os.walk(fs_enc(self._temp_path)):
                 for f in files:
                     os.unlink(os.path.join(root, f))
                 for d in dirs:
@@ -80,93 +127,100 @@ class TEngine:
 
 
     def load_file(self, file_name):
-        if xbmcvfs.exists(file_name):
-            self.torrent_file = file_name
-            fl = xbmcvfs.File(file_name, 'rb')
-            content = fl.read()
-            fl.close()
-            if self.en_type == TEngine.ACESTREAM:
-                self.status = self.engine.load_torrent(base64.b64encode(content), 'RAW')
-                if self.status:
-                    for k, v in self.engine.files.iteritems():
-                        self.files.append({"index": int(v), "file": k, 'size': 0})
-            elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
-                fls = self.lt.torrent_info(self.lt.bdecode(content))
-                for c_id, c_fl in enumerate(fls.files()):
-                    if self.re_fl_ext.search(c_fl.path):
-                        if self.re_fl_ext.search(c_fl.path).group(1)[1:] in TEngine.VIDEO_FILE_EXT:
-                            self.files.append({'index': int(c_id), 'file': self.re_path2fl.sub('', c_fl.path),
-                                               'size': c_fl.size})
-                self.torrent_file = os.path.join(self.torrent_file_dir, self.re_path2fl.sub('', file_name))
-                if file_name != self.torrent_file:
-                    fl_s = xbmcvfs.File(file_name, 'rb')
-                    fl_d = xbmcvfs.File(self.torrent_file, 'wb')
-                    fl_d.write(fl_s.read())
-                    fl_d.close()
-                    fl_s.close()
-                dht_routers = ["router.bittorrent.com:6881", "router.utorrent.com:6881"]
-                user_agent = 'uTorrent/2200(24683)'
-                if self.en_type == TEngine.PY2HTTP:
-                    from pyrrent2http import Engine
-                else:
-                    from torrent2http import Engine
-                self.engine = Engine(uri=urlparse.urljoin('file:', urllib.pathname2url(self.torrent_file)),
-                                     download_path=self.torrent_store_dir, connections_limit=None, encryption=1,
-                                     download_kbps=0, upload_kbps=0, keep_complete=self.keep_files,
-                                     keep_incomplete=self.keep_files, keep_files=self.keep_files,
-                                     dht_routers=dht_routers, use_random_port=True, listen_port=6881, user_agent=user_agent,
-                                     resume_file=None if not self.keep_files else self.torrent_file + '.resume_data')
-                del Engine
-                self.status = 'Ok'
+        if not xbmcvfs.exists(file_name):
+            self.log('Torrent file not found: %s' % file_name)
+            raise Exception('Torrent file not found: %s' % file_name)
+        self._file_name = file_name
+        fl = xbmcvfs.File(self._file_name, 'rb')
+        content = fl.read()
+        fl.close()
+        if self._engine_type == TEngine.ACESTREAM:
+            self._status = self._engine.load_torrent(base64.b64encode(content), 'RAW')
+            if self._status:
+                for k, v in self._engine.files.iteritems():
+                    self._files.append({"index": int(v), "file": k, 'size': 0})
+        elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
+            fls = self._lt.torrent_info(self._lt.bdecode(content))
+            for c_id, c_fl in enumerate(fls.files()):
+                if self._re_fl_ext.search(c_fl.path):
+                    if self._re_fl_ext.search(c_fl.path).group(1)[1:] in TEngine.VIDEO_FILE_EXT:
+                        self._files.append({'index': int(c_id), 'file': self._re_path2fl.sub('', c_fl.path),
+                                           'size': c_fl.size})
+            torrent_file = os.path.join(self._temp_path, self._re_path2fl.sub('', self._file_name))
+            if self._file_name != torrent_file:
+                fl_s = xbmcvfs.File(self._file_name, 'rb')
+                fl_d = xbmcvfs.File(torrent_file, 'wb')
+                fl_d.write(fl_s.read())
+                fl_d.close()
+                fl_s.close()
+            dht_routers = ["router.bittorrent.com:6881", "router.utorrent.com:6881"]
+            user_agent = 'uTorrent/2200(24683)'
+            keep_files = bool(self._save_path)
+            if self._engine_type == TEngine.PY2HTTP:
+                from pyrrent2http import Engine
+            else:
+                from torrent2http import Engine
+            self._engine = Engine(uri=urlparse.urljoin('file:', urllib.pathname2url(torrent_file)),
+                                 download_path=self._save_path if self._save_path else self._temp_path,
+                                  connections_limit=None, encryption=1,
+                                 download_kbps=0, upload_kbps=0, keep_complete=keep_files,
+                                 keep_incomplete=keep_files, keep_files=keep_files,
+                                 dht_routers=dht_routers, use_random_port=True, listen_port=6881, user_agent=user_agent,
+                                 resume_file=None if not keep_files else torrent_file + '.resume_data')
+            del Engine
+            self._status = 'Ok'
 
     def play(self, index, title, icon='', image='', use_resolved_url=False):
-        if self.status == 'Ok':
-            if self.en_type == TEngine.ACESTREAM:
-                return self.engine.play_url_ind(int(index), title, icon, image, use_resolved_url)
-            elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
-                self.player = tpy2httpPlayer(engine=self.engine, en_type=self.en_type, index=index, title=title,
+        if self._status == 'Ok':
+            if self._engine_type == TEngine.ACESTREAM:
+                return self._engine.play_url_ind(int(index), title, icon, image, use_resolved_url)
+            elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
+                self._player = tpy2httpPlayer(engine=self._engine, en_type=self._engine_type, index=index, title=title,
                                              icon=icon, image=image, use_resolved_url=use_resolved_url,
-                                             resume_saved=self.resume_saved)
-                while self.player.active:
+                                             resume_saved=self._resume_saved)
+                while self._player.active:
                     xbmc.sleep(300)
-                    self.player.loop()
+                    self._player.loop()
                     if xbmc.abortRequested:
                         break
-                return not self.player.err
+                return not self._player.err
         else:
             return False
 
     def enumerate_files(self):
-        return self.files
+        return self._files
 
     def set_resume_saved(self, rs):
-        if self.en_type == TEngine.ACESTREAM:
-            self.engine.resume_saved = rs
-        elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
+        if self._engine_type == TEngine.ACESTREAM:
+            self._engine_type.resume_saved = rs
+        elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
             self.resume_saved = rs
 
     def is_file_playback_ended(self):
-        if self.en_type == TEngine.ACESTREAM:
-            if not self.engine.player:
+        if self._engine_type == TEngine.ACESTREAM:
+            if not self._engine.player:
                 return False
-            return self.engine.player.ended
-        elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
-            if not self.player:
+            return self._engine.player.ended
+        elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
+            if not self._player:
                 return False
-            return self.player.ended
+            return self._player.ended
 
     def end(self):
-        if self.en_type == TEngine.ACESTREAM:
-            self.engine.end()
-        elif self.en_type == TEngine.PY2HTTP or self.en_type == TEngine.T2HTTP:
+        if self._engine_type == TEngine.ACESTREAM:
+            self._engine.end()
+        elif self._engine_type == TEngine.PY2HTTP or self._engine_type == TEngine.T2HTTP:
             try:
-                self.engine.close()
+                self._engine.close()
             except:
                 pass
 
 
 class tpy2httpPlayer(xbmc.Player):
     def __init__(self, engine, en_type, index, title, icon, image, use_resolved_url, resume_saved):
+        from debug import CDebug
+        self.log = CDebug(prefix='TENGINE_PLYAER')
+        del CDebug
         self.title = title
         self.index = index
         self.engine = engine
@@ -203,9 +257,10 @@ class tpy2httpPlayer(xbmc.Player):
             else:
                 if not self.engine.started:
                     self.engine.start(index)
-        except:
+        except Exception, e:
             self.err = True
             self.active = False
+            self.log('Error: %s' % e)
             return
         progress = xbmcgui.DialogProgress()
         progress.create('Py2http' if self.en_type == TEngine.PY2HTTP else 'torrent2http', 'Инициализация')
@@ -229,6 +284,7 @@ class tpy2httpPlayer(xbmc.Player):
             except:
                 self.err = True
                 self.active = False
+                self.log('Error: %s' % e)
                 return
             if not file_status:
                 continue
@@ -268,8 +324,9 @@ class tpy2httpPlayer(xbmc.Player):
     def loop(self):
         status = self.engine.status()
         file_status = self.engine.file_status(self.index)
-        if status.state == self.state.FINISHED and self.isPlaying() and self.resume_saved:
+        if status.state == self.state.FINISHED and self.isPlaying() and self.resume_saved and not self.paused:
             xbmc.sleep(2000)
+            self.log('Resuming playback from local file')
             item = xbmcgui.ListItem(self.title, self.icon, self.image, path=file_status.save_path)
             item.setProperty('StartOffset', str(self.getTime()))
             self.ov_hide()
@@ -297,7 +354,8 @@ class tpy2httpPlayer(xbmc.Player):
                                        (int((float(file_status.download) / float(file_status.size)) * 100.0),
                                         int(status.num_seeds), int(status.download_rate)))
             elif status.state == self.state.FINISHED:
-                self.ov_label.setLabel('Загрузка завершена.\n[B]Пауза.[/B]')
+                #self.ov_label.setLabel('Загрузка завершена.\n[B]Пауза.[/B]')
+                self.ov_hide()
 
     def onPlayBackStarted(self):
         return
@@ -312,7 +370,8 @@ class tpy2httpPlayer(xbmc.Player):
         self.active = False
 
     def onPlayBackPaused(self):
-        self.ov_show()
+        if self.engine.status().state != self.state.FINISHED:
+            self.ov_show()
         self.paused = True
 
     def onPlayBackResumed(self):
@@ -337,9 +396,3 @@ def fs_dec(path):
     sys_enc = sys.getfilesystemencoding() if sys.getfilesystemencoding() else 'utf-8'
     return path.decode(sys_enc).encode('utf-8')
 
-
-def debug(s):
-    from datetime import datetime
-    log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'TENGINE.log'), 'a')
-    log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
-    log.close()

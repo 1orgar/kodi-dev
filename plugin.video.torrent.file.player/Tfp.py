@@ -98,13 +98,13 @@ class Tfp(object):
 
     def _get_contents(self, torrent_file):
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine), temp_path=self.temp_folder)
+        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), temp_path=self.temp_folder)
         del TEngine
         if not self.folder or self.cont_play:
             torrent.cleanup()
-        if len(torrent.files) == 1:
+        if len(torrent.enumerate_files()) == 1:
             self.cont_play = False
-        for file in sorted(torrent.files, key=lambda k: k['file']):
+        for file in sorted(torrent.enumerate_files(), key=lambda k: k['file']):
             info = dict()
             li = xbmcgui.ListItem(urllib.unquote(file['file']), iconImage='DefaultVideo.png', thumbnailImage='DefaultVideo.png')
             li.setProperty('IsPlayable', 'false' if self.cont_play else 'true')
@@ -128,7 +128,7 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine), self.folder, self.save, self.resume_saved, self.temp_folder)
+        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), save_path=self.folder, resume_saved=self.resume_saved, temp_path=self.temp_folder)
         del TEngine
         if not torrent.play(index, title, 'DefaultVideo.png', self.icon, True):
             xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Playback Error", 2000, "")')
@@ -141,7 +141,7 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(torrent_file, int(self.engine), temp_path=self.temp_folder)
+        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), temp_path=self.temp_folder)
         del TEngine
         play_start = False
         for file in sorted(torrent.files, key=lambda k: k['file']):

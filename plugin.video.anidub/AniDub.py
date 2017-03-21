@@ -8,7 +8,7 @@ import xbmc
 import xbmcgui
 import xbmcplugin
 import urlparse
-from debug import CDebug
+
 
 def mkreq(params):
     return '%s?%s' % (sys.argv[0], urllib.urlencode(params))
@@ -36,6 +36,10 @@ class Main:
     site_url = 'http://tr.anidub.com/'
 
     def __init__(self):
+        from debug import CDebug
+        self.log = CDebug('AniDUB.log', 'MAIN')
+        del CDebug
+        self.log('Initialization')
         self.addon_data_dir = fs_enc(xbmc.translatePath(Main.__settings__.getAddonInfo('profile')))
         self.images_dir = os.path.join(self.addon_data_dir, 'images')
         self.torrents_dir = os.path.join(self.addon_data_dir, 'torrents')
@@ -50,19 +54,22 @@ class Main:
         if bool(Main.__settings__.getSetting("use_custom_temp_folder").lower() == 'true'):
             self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
             if not os.path.exists(fs_enc(self.temp_folder)):
+                self.log('Custom temporary folder is not exists, using system default')
                 self.temp_folder = None
         else:
             self.temp_folder = None
-        self.log = CDebug('AniDUB.log', 'MAIN')
-        self.log('Initialization')
         self.progress = xbmcgui.DialogProgress()
         if not os.path.exists(self.addon_data_dir):
+            self.log('Creating folder: ' + self.addon_data_dir)
             os.makedirs(self.addon_data_dir)
         if not os.path.exists(self.images_dir):
+            self.log('Creating folder: ' + self.images_dir)
             os.mkdir(self.images_dir)
         if not os.path.exists(self.torrents_dir):
+            self.log('Creating folder: ' + self.torrents_dir)
             os.mkdir(self.torrents_dir)
         if not os.path.exists(self.library_dir):
+            self.log('Creating folder: ' + self.library_dir)
             os.mkdir(self.library_dir)
         self.params = {'mode': 'main', 'url': Main.site_url, 'param': '', 'page': 1}
         args = urlparse.parse_qs(sys.argv[2][1:])
@@ -155,11 +162,12 @@ class Main:
             return '%s%s/page/%d/' % (Main.site_url, self.params['param'], int(self.params['page']))
 
     def execute(self):
-        self.log('mode: ' + self.params['mode'])
+        self.log('Mode: %s %s' % (self.params['mode'], self.params['param']))
         getattr(self, 'f_' + self.params['mode'])()
         self.end()
 
     def end(self):
+        self.log('Shutting down')
         try:
             self.DB.end()
         except:
@@ -267,9 +275,11 @@ class Main:
             self.url.get('%s?do=favorites&doaction=add&id=%d' % (Main.site_url, int(self.params['id'])))
             xbmc.executebuiltin('RunPlugin(plugin://script.media.aggregator/?action=anidub-add-favorites)')
             show_message("Добавлено в избранное", self.params['title'])
+            self.log('Favorites added (%s)' % self.params['title'])
         elif self.params['param'] == 'remove':
             self.url.get('%s?do=favorites&doaction=del&id=%d' % (Main.site_url, int(self.params['id'])))
             show_message("Удалено", self.params['title'])
+            self.log('Favorites removed (%s)' % self.params['title'])
             xbmc.executebuiltin('Container.Refresh')
 
     def f_library(self):
@@ -291,6 +301,7 @@ class Main:
         data = self._parse_torrent_from_anime_page(self.params['id'])
         cover = self._get_image(anime_id=self.params['id'])
         excl_res = ['ost', 'manga']
+        self.log('Loading id %s' % self.params['id'])
         if self.source_quality > 0:
             tf = None
             idx = 10
@@ -306,6 +317,7 @@ class Main:
                     tf = v
             if not tf:
                 show_message('AniDUB', 'Ошибка загрузки', icon=self.icon)
+                self.log('Loading error')
                 return
             self.params = {'mode': 'play_torrent', 'torrent_file_url': tf['t'],
                            'id': self.params['id'], 's': tf['s'], 'l': tf['l']}
@@ -323,6 +335,7 @@ class Main:
 
     def f_play_torrent(self):
         if xbmc.getInfoLabel('Container.PluginName') != 'plugin.video.anidub':
+            self.log('External playback calls denied')
             return
         from tengine import TEngine
         if 'engine' in self.params:
@@ -335,7 +348,8 @@ class Main:
             file_name = self.url.download_file(target=self.params['torrent_file_url'],
                                                referer=self._get_short_url(anime_id=self.params['id']),
                                                dest_name='anidub_%d.torrent' % int(self.params['id']))
-            torrent.cleanup()
+            #torrent.cleanup()
+            self.log('Loading torrent file %s' % file_name)
             torrent.load_file(fs_dec(file_name))
             for fl in torrent.enumerate_files():
                 viewed_ep = self.DB.is_episode_viewed(anime_id=anime_id, file_name=fl['file'])
@@ -353,7 +367,7 @@ class Main:
         else:
             torrent.load_file(os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % int(self.params['id'])))
             title = filter(lambda x: x['index'] == int(self.params['index']), torrent.enumerate_files())[0]['file']
-            self.log('Title: %s' % title)
+            self.log('Starting playback %s file' % title)
             self.DB.viewed_episode_add(anime_id=anime_id, file_name=title)
             torrent.play(int(self.params['index']), title, 'DefaultVideo.png', cover,
                          False if 'engine' in self.params else True)
@@ -361,6 +375,11 @@ class Main:
 
     def f_check_settings(self):
         self.__settings__.openSettings()
+
+    def f_p2psettings(self):
+        import xbmcaddon
+        xbmcaddon.Addon(id='script.module.tengine').openSettings()
+        self.f_check_settings()
 
     def f_search(self):
         if 'new' in self.params:

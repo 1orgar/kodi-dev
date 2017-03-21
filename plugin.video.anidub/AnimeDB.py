@@ -5,6 +5,10 @@ import re
 
 class AnimeDB:
     def __init__(self, data_file):
+        from debug import CDebug
+        self.log = CDebug(prefix='DB')
+        del CDebug
+        self.log('Loading database')
         import sqlite3 as db
         self.c = db.connect(database=data_file)
         del db
@@ -26,6 +30,7 @@ class AnimeDB:
             self.c.commit()
             self.cu.execute('CREATE INDEX t_i ON viewed_episodes (added)')
             self.c.commit()
+            self.log('Creating table viewed_episodes')
         self.cu.execute('SELECT COUNT(1) FROM sqlite_master WHERE type=\'table\' AND name=\'anime_db\'')
         self.c.commit()
         if self.cu.fetchone()[0] == 0:
@@ -33,11 +38,13 @@ class AnimeDB:
             self.c.commit()
             self.cu.execute('CREATE UNIQUE INDEX i_i ON anime_db (anime_id)')
             self.c.commit()
+            self.log('Creating table anime_db')
         self.cu.execute('SELECT COUNT(1) FROM sqlite_master WHERE type=\'table\' AND name=\'search_list\'')
         self.c.commit()
         if self.cu.fetchone()[0] == 0:
             self.cu.execute('CREATE TABLE search_list(search TEXT PRIMARY KEY NOT NULL)')
             self.c.commit()
+            self.log('Creating table search_list')
 
     def searches_add(self, s):
         self.cu.execute('INSERT OR REPLACE INTO search_list (search) VALUES (?)', (s.decode('utf-8'),))
