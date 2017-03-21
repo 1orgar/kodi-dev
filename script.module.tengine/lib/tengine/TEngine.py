@@ -308,6 +308,7 @@ class tpy2httpPlayer(xbmc.Player):
         file_status = self.engine.file_status(self.index)
         progress.close()
         if status.state == self.state.FINISHED:
+            self.log('Existing file already downloaded, starting local file playback')
             item = xbmcgui.ListItem(title, icon, image, path=file_status.save_path)
             self.active = False
             if use_resolved_url:
