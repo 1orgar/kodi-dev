@@ -292,7 +292,7 @@ class tpy2httpPlayer(xbmc.Player):
             if preload_size < TEngine.PRELOAD_SIZE_MIN: preload_size = TEngine.PRELOAD_SIZE_MIN
             if preload_size > TEngine.PRELOAD_SIZE_MAX: preload_size = TEngine.PRELOAD_SIZE_MAX
             if status.state == self.state.CHECKING_FILES:
-                progress.update(int(status.progress * 100), 'Checking preloaded files...', ' ')
+                progress.update(int(status.progress * 100), 'Проверка файла', ' ')
             elif status.state == self.state.DOWNLOADING:
                 progress.update(int((float(file_status.download) / float(preload_size)) * 100.0),
                                    'Предварительная буферизация', 'Сиды: [B]%d[/B], скорость: [B]%dKb/s[/B]' %
@@ -355,7 +355,6 @@ class tpy2httpPlayer(xbmc.Player):
                                        (int((float(file_status.download) / float(file_status.size)) * 100.0),
                                         int(status.num_seeds), int(status.download_rate)))
             elif status.state == self.state.FINISHED:
-                #self.ov_label.setLabel('Загрузка завершена.\n[B]Пауза.[/B]')
                 self.ov_hide()
 
     def onPlayBackStarted(self):
