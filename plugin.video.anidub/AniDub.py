@@ -36,7 +36,7 @@ class Main:
     site_url = 'http://tr.anidub.com/'
 
     def __init__(self):
-        from debug import CDebug
+        from cdebug import CDebug
         self.log = CDebug('AniDUB.log', 'MAIN')
         del CDebug
         self.log('Initialization')
@@ -50,14 +50,6 @@ class Main:
         self.show_history = bool(Main.__settings__.getSetting("show_history").lower() == 'true')
         self.show_search = bool(Main.__settings__.getSetting("show_search").lower() == 'true')
         self.show_peers = bool(Main.__settings__.getSetting("show_peers").lower() == 'true')
-        self.engine = int(Main.__settings__.getSetting("engine"))
-        if bool(Main.__settings__.getSetting("use_custom_temp_folder").lower() == 'true'):
-            self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
-            if not os.path.exists(fs_enc(self.temp_folder)):
-                self.log('Custom temporary folder is not exists, using system default')
-                self.temp_folder = None
-        else:
-            self.temp_folder = None
         self.progress = xbmcgui.DialogProgress()
         if not os.path.exists(self.addon_data_dir):
             self.log('Creating folder: ' + self.addon_data_dir)
@@ -94,6 +86,9 @@ class Main:
                 show_message('Ошибка', 'Проверьте логин и пароль')
                 self.log('Wrong authentication credentials')
                 return
+        if Main.__settings__.getSetting("engine") != '':
+            Main.__settings__.setSetting("engine", '')
+            self.params['mode'] = 'p2psettings'
         self.res_list = ['bd1080', 'tv1080', 'bd720', 'tv720', 'dvd720', 'dvd480', 'hwp', 'psp', '']
         from AnimeDB import AnimeDB
         self.DB = AnimeDB(fs_dec(os.path.join(self.addon_data_dir, 'anidata.db')))
@@ -289,8 +284,7 @@ class Main:
             series_dir = os.path.join(self.library_dir, dir_name)
             os.mkdir(series_dir)
             from tengine import TEngine
-            torrent = TEngine(file_name=os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % anime_id),
-                             engine_type=TEngine.T2HTTP, temp_path=self.temp_folder)
+            torrent = TEngine(file_name=os.path.join(fs_dec(self.torrents_dir), 'anidub_%d.torrent' % anime_id))
             for i in torrent.enumerate_files():
                 fl = open(os.path.join(series_dir, '%s.strm' % os.path.splitext(i['file'])[0]), 'w')
                 fl.write(mkreq({'mode': 'play_torrent', 'param': 'query_info', 'index': int(i['index']), 'id': int(anime_id)}))
@@ -301,7 +295,7 @@ class Main:
         data = self._parse_torrent_from_anime_page(self.params['id'])
         cover = self._get_image(anime_id=self.params['id'])
         excl_res = ['ost', 'manga']
-        self.log('Loading id %s' % self.params['id'])
+        self.log('Loading id: %s' % self.params['id'])
         if self.source_quality > 0:
             tf = None
             idx = 10
@@ -338,9 +332,7 @@ class Main:
             self.log('External playback calls denied')
             return
         from tengine import TEngine
-        if 'engine' in self.params:
-            self.engine = int(self.params['engine'])
-        torrent = TEngine(engine_type=self.engine, temp_path=self.temp_folder)
+        torrent = TEngine()
         anime_id = self.params['id']
         cover = self._get_image(anime_id=anime_id)
         if 'torrent_file_url' in self.params:
@@ -348,7 +340,6 @@ class Main:
             file_name = self.url.download_file(target=self.params['torrent_file_url'],
                                                referer=self._get_short_url(anime_id=self.params['id']),
                                                dest_name='anidub_%d.torrent' % int(self.params['id']))
-            #torrent.cleanup()
             self.log('Loading torrent file %s' % file_name)
             torrent.load_file(fs_dec(file_name))
             for fl in torrent.enumerate_files():
@@ -369,8 +360,7 @@ class Main:
             title = filter(lambda x: x['index'] == int(self.params['index']), torrent.enumerate_files())[0]['file']
             self.log('Starting playback %s file' % title)
             self.DB.viewed_episode_add(anime_id=anime_id, file_name=title)
-            torrent.play(int(self.params['index']), title, 'DefaultVideo.png', cover,
-                         False if 'engine' in self.params else True)
+            torrent.play(int(self.params['index']), title, 'DefaultVideo.png', cover, True)
         torrent.end()
 
     def f_check_settings(self):
@@ -500,6 +490,9 @@ class Main:
         articles = soup.find_all('article', {'class': 'story'})
         i = 20
         for article in articles:
+            if xbmc.abortRequested or self.progress.iscanceled():
+                break
+            xbmc.sleep(50)
             self.progress.update(i, "Идет загрузка данных", '')
             if u'Манга' in article.div.div.div.get_text() or u'OST' in article.div.div.div.get_text():
                 continue

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="script.module.cdebug"
+       name="cdebug"
+       version="1.0"
+       provider-name="1orgar">
+  <requires>
+    <import addon="xbmc.python" version="2.7.13"/>
+  </requires>
+  <extension point="xbmc.python.module"
+             library="lib" />
+  <extension point="xbmc.addon.metadata">
+    <summary>Debug engine</summary>
+    <license>LGPL</license>
+    <platform>all</platform>
+  </extension>
+</addon>

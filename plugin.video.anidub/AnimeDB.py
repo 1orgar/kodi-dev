@@ -5,7 +5,7 @@ import re
 
 class AnimeDB:
     def __init__(self, data_file):
-        from debug import CDebug
+        from cdebug import CDebug
         self.log = CDebug(prefix='DB')
         del CDebug
         self.log('Loading database')

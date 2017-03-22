@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<addon id="script.module.tengine" name="TEngine" version="1.5.2" provider-name="1orgar">
+<addon id="script.module.tengine" name="TEngine" version="1.5.5" provider-name="1orgar">
   <requires>
     <import addon="xbmc.python" version="2.7.13"/>
     <import addon="script.module.libtorrent"/>
     <import addon="script.module.torrent.ts"/>
     <import addon="script.module.pyrrent2http"/>
     <import addon="script.module.torrent2http"/>
+    <import addon="script.module.cdebug"/>
   </requires>
   <extension point="xbmc.python.script" library="default.py">
     <provides>executable</provides>
   </extension>
   <extension point="xbmc.python.module" library="lib" />
   <extension point="xbmc.addon.metadata">
-    <summary>Simple interface to most popular torrent engines</summary>
+    <summary>TEngine torrent streaming support</summary>
     <description>Simple interface to most popular KODI torrent streaming engines</description>
     <license>GPL</license>
     <platform>all</platform>

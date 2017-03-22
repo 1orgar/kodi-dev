@@ -333,13 +333,17 @@ class _TSPlayer(xbmc.Player):
 
     @staticmethod
     def get_skin_resolution():
-        import xml.etree.ElementTree as Et
-        skin_path = fs_enc(xbmc.translatePath('special://skin/'))
-        tree = Et.parse(os.path.join(skin_path, 'addon.xml'))
-        res = tree.findall('./extension/res')[0]
-        return int(res.attrib['width']), int(res.attrib['height'])
+        import xml.etree.ElementTree as ET
+        skin_path = fs_enc(xbmc.translatePath("special://skin/"))
+        tree = ET.parse(os.path.join(skin_path, "addon.xml"))
+        res  = tree.findall('./extension/res[@aspect="%s"]' % xbmc.getInfoLabel('Skin.AspectRatio'))
+        if not res:
+            res = tree.findall('./extension/res')
+        return int(res[0].attrib["width"]), int(res[0].attrib["height"])
 
     def ov_show(self):
+        if int(self.tsserv.status[0]) == 100 and self.tsserv.status[1] == TSengine.ls(30030):
+            return
         if not self.ov_visible:
             self._ov_window.addControls([self._ov_background, self._ov_label])
             self.ov_visible = True
@@ -352,11 +356,10 @@ class _TSPlayer(xbmc.Player):
     def ov_update(self):
         if self.ov_visible:
             if int(self.tsserv.status[0]) == 100 and self.tsserv.status[1] == TSengine.ls(30030):
-                self._ov_label.setLabel('%s\n[B]%s[/B]' % (TSengine.ls(30035),
-                                                           TSengine.ls(30036)))
+                self.ov_hide()
             else:
                 self._ov_label.setLabel('%s\n%s [B]%d%%[/B]\n%s' % (self.tsserv.status[1],
-                                                                    TSengine.ls(30037),
+                                                                    TSengine.ls(30035),
                                                                     int(self.tsserv.status[0]),
                                                                     self.tsserv.status[2]))
 

@@ -35,8 +35,6 @@
     <string id="30032">Ожидание сидов</string>
     <string id="30033">Нет достаточной скорости</string>
     <string id="30034">Сиды: [B]%s[/B], скорость: [B]%sKb/s[/B]</string>
-    <string id="30035">Загрузка завершена</string>
-    <string id="30036">Пауза</string>
-    <string id="30037">Завершено:</string>
+    <string id="30035">Завершено:</string>
 
 </strings>

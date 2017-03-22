@@ -17,7 +17,7 @@ class Url:
     }
 
     def __init__(self, use_auth=False, auth_state=False):
-        from debug import CDebug
+        from cdebug import CDebug
         self.log = CDebug(prefix='URL')
         del CDebug
         self.log('Initialization')

@@ -35,7 +35,5 @@
     <string id="30032">Waiting for seeders</string>
     <string id="30033">Not enough speed</string>
     <string id="30034">Seeders: [B]%s[/B], speed: [B]%sKb/s[/B]</string>
-    <string id="30035">Downloading complete</string>
-    <string id="30036">Paused</string>
-    <string id="30037">Complete:</string>
+    <string id="30035">Complete:</string>
 </strings>

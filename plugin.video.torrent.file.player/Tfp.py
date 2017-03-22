@@ -7,6 +7,7 @@ import xbmcgui
 import xbmcplugin
 import urlparse
 import urllib
+from cdebug import CDebug
 
 WIDE_LIST_VIEW = {'skin.confluence': 51, 'skin.estouchy': 550, 'skin.estuary': 55, 'skin.xperience1080': 50,
                   'skin.re-touched': 50, 'skin.unity': 51, 'skin.transparency': 52, 'skin.aeon.nox.5': 55}
@@ -15,12 +16,9 @@ def fs_enc(path):
     sys_enc = sys.getfilesystemencoding() if sys.getfilesystemencoding() else 'utf-8'
     return path.decode('utf-8').encode(sys_enc)
 
-def debug(s):
-    pass
-    #from datetime import datetime
-    #log = open(os.path.join(fs_enc(xbmc.translatePath('special://home')), 'Tfp.log'), 'a')
-    #log.write('%s: %s\r\n' % (str(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3]), str(s)))
-    #log.close()
+def fs_dec(path):
+    sys_enc = sys.getfilesystemencoding() if sys.getfilesystemencoding() else 'utf-8'
+    return path.decode(sys_enc).encode('utf-8')
 
 class Tfp(object):
     __plugin__ = sys.modules["__main__"].__plugin__
@@ -30,12 +28,15 @@ class Tfp(object):
     icon = os.path.join(__root__, 'icon.png')
 
     def __init__(self):
+        self.log = CDebug(filename='Tfp.log', prefix='TFP')
+        self.log('Initialization')
         self.params = dict()
         args = urlparse.parse_qs(sys.argv[2][1:])
         self.params['mode'] = args.get('mode', ['main'])[0]
         self.params['file'] = args.get('file', [''])[0]
         self.params['torrent_file'] = args.get('torrent_file', [''])[0]
         self.params['index'] = int(args.get('index', [0])[0])
+        self.log('Loading database')
         import sqlite3 as db
         addon_data_path = fs_enc(xbmc.translatePath(self.__settings__.getAddonInfo('profile')))
         if not os.path.exists(addon_data_path):
@@ -45,35 +46,30 @@ class Tfp(object):
         self.cu = self.c.cursor()
         self._create_tables()
         del db
-        if self.__settings__.getSetting("use_custom_temp_folder").lower() == 'true':
-            self.temp_folder =  self.__settings__.getSetting('custom_temp_folder')
-            if not os.path.exists(fs_enc(self.temp_folder)):
-                self.temp_folder = None
-        else:
-            self.temp_folder = None
-        self.cont_play = True if self.__settings__.getSetting('cont_play') == 'true' else False
-        self.save = True if self.__settings__.getSetting('save') == 'true' else False
-        self.folder = self.__settings__.getSetting('folder') if self.save else None
-        if self.save and not os.path.exists(fs_enc(self.folder)):
-            xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Saving folder not found", 2000, "")')
-            self.__settings__.openSettings()
-            sys.exit(0)
-        self.resume_saved = True if self.__settings__.getSetting('switch_playback') == 'true' else False
-        self.engine = self.__settings__.getSetting('engine')
+        self.cont_play = Tfp.__settings__.getSetting('cont_play') == 'true'
+        if Tfp.__settings__.getSetting("engine") != '':
+            Tfp.__settings__.setSetting("engine", '')
+            self.params['mode'] = 'p2psettings'
 
     def execute(self):
+        self.log('Mode: %s' % self.params['mode'])
         if self.params['mode'] == 'main':
             self._open_torrent_dialog()
         elif self.params['mode'] == 'play':
             self._play_file_index(self.params['torrent_file'], self.params['file'], self.params['index'])
         elif self.params['mode'] == 'cplay':
             self._continious_play(self.params['torrent_file'], self.params['index'])
+        elif self.params['mode'] == 'p2psettings':
+            import xbmcaddon
+            xbmcaddon.Addon(id='script.module.tengine').openSettings()
+            Tfp.__settings__.openSettings()
         self.c.close()
 
     def _create_tables(self):
         self.cu.execute('SELECT COUNT(1) FROM sqlite_master WHERE type=\'table\' AND name=\'viewed\'')
         self.c.commit()
         if self.cu.fetchone()[0] == 0:
+            self.log('Creating database tables')
             self.cu.execute('CREATE TABLE IF NOT EXISTS viewed(file TEXT NOT NULL PRIMARY KEY)')
             self.c.commit()
             self.cu.execute('CREATE INDEX f_i ON viewed (file)')
@@ -84,6 +80,7 @@ class Tfp(object):
 
     def _consist_check(self):
         if xbmc.getInfoLabel('Container.PluginName') != 'plugin.video.torrent.file.player':
+            self.log('External playback calls denied')
             return False
         return True
 
@@ -91,17 +88,17 @@ class Tfp(object):
         if self.params['torrent_file'] == '':
             open_dialog = xbmcgui.Dialog()
             torrent_file = open_dialog.browse(1, 'Выберите .torrent файл.', 'video', '.torrent')
+            if torrent_file:
+                xbmc.executebuiltin('XBMC.Container.Update("plugin://plugin.video.torrent.file.player?mode=main&torrent_file=%s")' %
+                                    urllib.quote_plus(torrent_file))
         else:
-            torrent_file = self.params['torrent_file']
-        if torrent_file:
-            self._get_contents(torrent_file=torrent_file)
+            self._get_contents(torrent_file=self.params['torrent_file'])
 
     def _get_contents(self, torrent_file):
         from tengine import TEngine
-        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), temp_path=self.temp_folder)
+        self.log('Loading torrent file: %s' % torrent_file)
+        torrent = TEngine(file_name=torrent_file)
         del TEngine
-        if not self.folder or self.cont_play:
-            torrent.cleanup()
         if len(torrent.enumerate_files()) == 1:
             self.cont_play = False
         for file in sorted(torrent.enumerate_files(), key=lambda k: k['file']):
@@ -128,8 +125,9 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), save_path=self.folder, resume_saved=self.resume_saved, temp_path=self.temp_folder)
+        torrent = TEngine(file_name=torrent_file)
         del TEngine
+        self.log('Starting playback: %s' % title)
         if not torrent.play(index, title, 'DefaultVideo.png', self.icon, True):
             xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Playback Error", 2000, "")')
         else:
@@ -141,10 +139,11 @@ class Tfp(object):
         if not self._consist_check():
             return
         from tengine import TEngine
-        torrent = TEngine(file_name=torrent_file, engine_type=int(self.engine), temp_path=self.temp_folder)
+        torrent = TEngine(file_name=torrent_file, resume_saved=False)
         del TEngine
         play_start = False
-        for file in sorted(torrent.files, key=lambda k: k['file']):
+        self.log('Starting continuous playback')
+        for file in sorted(torrent.enumerate_files(), key=lambda k: k['file']):
             if start_index == file['index']:
                 play_start = True
             if play_start:
@@ -154,7 +153,8 @@ class Tfp(object):
                 else:
                     self.cu.execute('INSERT OR REPLACE INTO viewed (file) VALUES (?)', (file['file'].decode('utf-8'),))
                     self.c.commit()
-                if not torrent.is_file_playback_ended():
+                if not torrent.playback_ended:
                     break
+            xbmc.sleep(2000)
         torrent.end()
 
