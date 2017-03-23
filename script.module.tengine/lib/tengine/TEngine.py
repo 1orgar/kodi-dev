@@ -267,7 +267,7 @@ class _tpy2httpPlayer(xbmc.Player):
                 status = self._engine.status()
                 self._engine.check_torrent_error(status)
                 file_status = self._engine.file_status(self._index)
-            except:
+            except Exception, e:
                 self.err = True
                 self.active = False
                 self.log('Error: %s' % e)
