@@ -33,9 +33,9 @@ class Tfp(object):
         self.params = dict()
         args = urlparse.parse_qs(sys.argv[2][1:])
         self.params['mode'] = args.get('mode', ['main'])[0]
-        self.params['file'] = args.get('file', [''])[0]
         self.params['torrent_file'] = args.get('torrent_file', [''])[0]
         self.params['index'] = int(args.get('index', [0])[0])
+        self.params['indexes'] = args.get('indexes', ['0'])[0]
         self.log('Loading database')
         import sqlite3 as db
         addon_data_path = fs_enc(xbmc.translatePath(self.__settings__.getAddonInfo('profile')))
@@ -56,9 +56,9 @@ class Tfp(object):
         if self.params['mode'] == 'main':
             self._open_torrent_dialog()
         elif self.params['mode'] == 'play':
-            self._play_file_index(self.params['torrent_file'], self.params['file'], self.params['index'])
+            self._play_file_index(self.params['torrent_file'], self.params['index'])
         elif self.params['mode'] == 'cplay':
-            self._continious_play(self.params['torrent_file'], self.params['index'])
+            self._continious_play(self.params['torrent_file'], self.params['indexes'])
         elif self.params['mode'] == 'p2psettings':
             import xbmcaddon
             xbmcaddon.Addon(id='script.module.tengine').openSettings()
@@ -108,9 +108,16 @@ class Tfp(object):
             info['size'] = int(file['size'])
             li.setInfo(type='video', infoLabels=info)
             if self.cont_play:
-                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'cplay', 'torrent_file': torrent_file, 'index': int(file['index'])}))
+                idx_list = ''
+                idx_start = False
+                for f in sorted(torrent.enumerate_files(), key=lambda k: k['file']):
+                    if file['index'] == f['index']:
+                        idx_start = True
+                    if idx_start:
+                        idx_list += '%d-' % f['index']
+                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'cplay', 'torrent_file': torrent_file, 'indexes': idx_list[:-1]}))
             else:
-                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'play', 'torrent_file': torrent_file, 'file': file['file'], 'index': int(file['index'])}))
+                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'play', 'torrent_file': torrent_file, 'index': int(file['index'])}))
             self.cu.execute('SELECT COUNT(1) FROM viewed WHERE file=?', (file['file'].decode('utf-8'),))
             self.c.commit()
             if self.cu.fetchone()[0] == 1:
@@ -121,40 +128,27 @@ class Tfp(object):
         xbmcplugin.endOfDirectory(handle=self.__handle__)
         torrent.end()
 
-    def _play_file_index(self, torrent_file, title, index):
+    def _play_file_index(self, torrent_file, index, resolved_url=True):
         if not self._consist_check():
             return
         from tengine import TEngine
         torrent = TEngine(file_name=torrent_file)
         del TEngine
+        title =''
+        for f in torrent.enumerate_files():
+            if f['index'] == index:
+                title = f['file']
         self.log('Starting playback: %s' % title)
-        if not torrent.play(index, title, 'DefaultVideo.png', self.icon, True):
+        if not torrent.play(index, title, 'DefaultVideo.png', self.icon, resolved_url):
             xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Playback Error", 2000, "")')
         else:
             self.cu.execute('INSERT OR REPLACE INTO viewed (file) VALUES (?)', (title.decode('utf-8'),))
             self.c.commit()
         torrent.end()
+        return torrent.playback_ended
 
-    def _continious_play(self, torrent_file, start_index):
-        if not self._consist_check():
-            return
-        from tengine import TEngine
-        torrent = TEngine(file_name=torrent_file, resume_saved=False)
-        del TEngine
-        play_start = False
-        self.log('Starting continuous playback')
-        for file in sorted(torrent.enumerate_files(), key=lambda k: k['file']):
-            if start_index == file['index']:
-                play_start = True
-            if play_start:
-                if not torrent.play(file['index'], file['file'], 'DefaultVideo.png', self.icon, False):
-                    xbmc.executebuiltin('XBMC.Notification("Torrent File Player", "Playback Error", 2000, "")')
-                    break
-                else:
-                    self.cu.execute('INSERT OR REPLACE INTO viewed (file) VALUES (?)', (file['file'].decode('utf-8'),))
-                    self.c.commit()
-                if not torrent.playback_ended:
-                    break
-            xbmc.sleep(2000)
-        torrent.end()
-
+    def _continious_play(self, torrent_file, indexes):
+        idx = indexes.split('-')
+        for i in idx:
+            if not self._play_file_index(torrent_file, int(i), False):
+                break
