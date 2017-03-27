@@ -86,11 +86,14 @@ class Tfp(object):
 
     def _open_torrent_dialog(self):
         if self.params['torrent_file'] == '':
+            xbmcplugin.endOfDirectory(handle=self.__handle__, succeeded=False, updateListing=True, cacheToDisc=False)
             open_dialog = xbmcgui.Dialog()
             torrent_file = open_dialog.browse(1, 'Выберите .torrent файл.', 'video', '.torrent')
             if torrent_file:
-                xbmc.executebuiltin('XBMC.Container.Update("plugin://plugin.video.torrent.file.player?mode=main&torrent_file=%s")' %
+                xbmc.executebuiltin('XBMC.Container.Update("plugin://plugin.video.torrent.file.player?mode=main&torrent_file=%s", replace)' %
                                     urllib.quote_plus(torrent_file))
+            else:
+                xbmc.executebuiltin('XBMC.Container.Update("addons://sources/video/", replace)')
         else:
             self._get_contents(torrent_file=self.params['torrent_file'])
 
@@ -125,7 +128,7 @@ class Tfp(object):
             xbmcplugin.addDirectoryItem(handle=self.__handle__, url=url, listitem=li, isFolder=False)
         xbmcplugin.setContent(handle=self.__handle__, content='Movies')
         xbmc.executebuiltin('Container.SetViewMode(%d)' % WIDE_LIST_VIEW.get(xbmc.getSkinDir(), 50))
-        xbmcplugin.endOfDirectory(handle=self.__handle__)
+        xbmcplugin.endOfDirectory(handle=self.__handle__, updateListing=True, cacheToDisc=True)
         torrent.end()
 
     def _play_file_index(self, torrent_file, index, resolved_url=True):
