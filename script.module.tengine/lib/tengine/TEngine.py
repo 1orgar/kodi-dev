@@ -161,7 +161,7 @@ class TEngine:
             del Engine
             self._status = 'Ok'
 
-    def play(self, index, title, icon='', image='', use_resolved_url=False):
+    def play(self, index, title='', icon='', image='', use_resolved_url=False):
         if self._status == 'Ok':
             if self._engine_type == TEngine.ACESTREAM:
                 return self._engine.play_url_ind(int(index), title, icon, image, use_resolved_url)
