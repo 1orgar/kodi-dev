@@ -5,8 +5,10 @@ import sys
 import xbmc
 import xbmcgui
 import xbmcplugin
+import xbmcvfs
 import urlparse
 import urllib
+import hashlib
 from cdebug import CDebug
 
 WIDE_LIST_VIEW = {'skin.confluence': 51, 'skin.estouchy': 550, 'skin.estuary': 55, 'skin.xperience1080': 50,
@@ -90,13 +92,32 @@ class Tfp(object):
         xbmc.executebuiltin('XBMC.Notification("%s", "%s", %s, "%s")' % (h, m, 3000, ''))
 
     def _add_to_ml(self):
+        file_name = self.params['torrent_file']
         self.log('ML: Params: %s' % CDebug.dump(self.params))
-
+        if not xbmcvfs.exists(file_name):
+            self.log('Torrent file not found: %s' % file_name)
+            raise Exception('Torrent file not found: %s' % file_name)
+        fl = xbmcvfs.File(file_name, 'rb')
+        content = fl.read()
+        fl.close()
+        h_file_name = os.path.join(self.stream_dir, '%s.torrent' % hashlib.sha1(content).hexdigest())
+        s_file_name = os.path.join(self.stream_dir, '%s.strm' % hashlib.sha1(self.params['title']).hexdigest())
+        self.log('Torrent file: %s' % h_file_name)
+        self.log('Stream file: %s' % s_file_name)
+        if not xbmcvfs.exists(h_file_name):
+            fl = xbmcvfs.File(h_file_name, 'wb')
+            fl.write(content)
+            fl.close()
+        if not xbmcvfs.exists(s_file_name):
+            fl = xbmcvfs.File(s_file_name, 'w')
+            fl.write(mkreq({'mode': 'play', 'torrent_file': h_file_name, 'index': int(self.params['index'])}))
+            fl.close()
 
     def _consist_check(self):
-        if xbmc.getInfoLabel('Container.PluginName') != 'plugin.video.torrent.file.player':
-            self.log('External playback calls denied')
-            return False
+        #if xbmc.getInfoLabel('Container.PluginName') != 'plugin.video.torrent.file.player':
+        #    self.log('External playback calls denied')
+        #    return False
+        self.log('External playback call from: %s' % xbmc.getInfoLabel('Container.Content'))
         return True
 
     def _open_torrent_dialog(self):
@@ -134,17 +155,15 @@ class Tfp(object):
                         idx_start = True
                     if idx_start:
                         idx_list += '%d-' % f['index']
-                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'cplay', 'torrent_file': torrent_file,
-                                                                 'indexes': idx_list[:-1]}))
+                url = mkreq({'mode': 'cplay', 'torrent_file': torrent_file, 'indexes': idx_list[:-1]})
             else:
-                url = '%s?%s' % (sys.argv[0],  urllib.urlencode({'mode': 'play', 'torrent_file': torrent_file,
-                                                                 'index': int(file['index'])}))
+                url = mkreq({'mode': 'play', 'torrent_file': torrent_file, 'index': int(file['index'])})
             self.cu.execute('SELECT COUNT(1) FROM viewed WHERE file=?', (file['file'].decode('utf-8'),))
             self.c.commit()
             if self.cu.fetchone()[0] == 1:
                 li.select(True)
             context_menu = [('Добавить в медиатеку', 'RunPlugin(%s)' %
-                                 mkreq({'mode': 'ml', 'params': 'add', 'torrent_file': torrent_file,
+                                 mkreq({'mode': 'ml', 'param': 'add', 'torrent_file': torrent_file,
                                         'index': int(file['index']), 'title': urllib.unquote(file['file'])}))]
             li.addContextMenuItems(context_menu)
             xbmcplugin.addDirectoryItem(handle=self.__handle__, url=url, listitem=li, isFolder=False)
