@@ -336,8 +336,11 @@ class _TSPlayer(xbmc.Player):
         import xml.etree.ElementTree as ET
         skin_path = fs_enc(xbmc.translatePath("special://skin/"))
         tree = ET.parse(os.path.join(skin_path, "addon.xml"))
-        res  = tree.findall('./extension/res[@aspect="%s"]' % xbmc.getInfoLabel('Skin.AspectRatio'))
-        if not res:
+        try:
+            res  = tree.findall('./extension/res[@aspect="%s"]' % xbmc.getInfoLabel('Skin.AspectRatio'))
+            if not res:
+                res = tree.findall('./extension/res')
+        except:
             res = tree.findall('./extension/res')
         return int(res[0].attrib["width"]), int(res[0].attrib["height"])
 

@@ -236,6 +236,8 @@ class _tpy2httpPlayer(xbmc.Player):
         self._ov_background = xbmcgui.ControlImage(x, y, w, h, fs_dec(ov_image))
         self._ov_background.setColorDiffuse("0xD0000000")
         self._ov_visible = False
+
+        self.log('Control IDs bg: %d, label: %d' % (self._ov_background.getId(), self._ov_label.getId()))
         try:
             if self._engine_type == TEngine.PY2HTTP:
                 if not self._engine.started:
@@ -336,12 +338,12 @@ class _tpy2httpPlayer(xbmc.Player):
     def _ov_update(self):
         if self._ov_visible:
             status = self._engine.status()
+            file_status = self._engine.file_status(self._index)
+            percent = int((float(file_status.download) / float(file_status.size)) * 100.0)
             if status.state == self._state.DOWNLOADING:
-                file_status = self._engine.file_status(self._index)
                 self._ov_label.setLabel('Загрузка файла\nЗавершено: [B]%d%%[/B]\nСиды: [B]%d[/B], скорость: [B]%dKb/s[/B]' %
-                                       (int((float(file_status.download) / float(file_status.size)) * 100.0),
-                                        int(status.num_seeds), int(status.download_rate)))
-            elif status.state == self._state.FINISHED:
+                                       (percent, int(status.num_seeds), int(status.download_rate)))
+            elif status.state == self._state.FINISHED or (status.state == self._state.DOWNLOADING and percent == 100):
                 self._ov_hide()
 
     def onPlayBackStarted(self):
@@ -370,8 +372,11 @@ class _tpy2httpPlayer(xbmc.Player):
         import xml.etree.ElementTree as ET
         skin_path = fs_enc(xbmc.translatePath("special://skin/"))
         tree = ET.parse(os.path.join(skin_path, "addon.xml"))
-        res  = tree.findall('./extension/res[@aspect="%s"]' % xbmc.getInfoLabel('Skin.AspectRatio'))
-        if not res:
+        try:
+            res  = tree.findall('./extension/res[@aspect="%s"]' % xbmc.getInfoLabel('Skin.AspectRatio'))
+            if not res:
+                res = tree.findall('./extension/res')
+        except:
             res = tree.findall('./extension/res')
         return int(res[0].attrib["width"]), int(res[0].attrib["height"])
 
