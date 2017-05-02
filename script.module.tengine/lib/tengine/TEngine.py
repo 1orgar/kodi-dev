@@ -221,7 +221,7 @@ class _tpy2httpPlayer(xbmc.Player):
         self.err = False
         self.ended = False
         xbmc.Player.__init__(self)
-        ov_image = fs_enc(os.path.join(xbmc.translatePath('special://temp/tengine'), 'bg.png'))
+        ov_image = fs_enc(os.path.join(xbmc.translatePath('special://temp/'), 'bg.png'))
         if not os.path.isfile(ov_image):
             fl = open(ov_image, 'wb')
             fl.write(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='))
