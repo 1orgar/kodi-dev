@@ -33,7 +33,7 @@ class Main:
     __settings__ = sys.modules["__main__"].__settings__
     __root__ = sys.modules["__main__"].__root__
     __handle__ = int(sys.argv[1])
-    site_url = 'http://tr.anidub.com/'
+    site_url = 'https://tr.anidub.com/'
 
     def __init__(self):
         from cdebug import CDebug
