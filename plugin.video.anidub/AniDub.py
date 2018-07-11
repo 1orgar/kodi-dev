@@ -77,7 +77,8 @@ class Main:
         self.url.download_dir = self.addon_data_dir
         self.url.cb_auth_ok = self._save_auth_setting
         if self.params['mode'] == 'main' and self.params['param'] == '':
-            os.remove(self.url.sid_file)
+            try: os.remove(self.url.sid_file)
+            except: pass
         if not self.__settings__.getSetting("login") or not self.__settings__.getSetting("password"):
             show_message('Авторизация', 'Укажите логин и пароль')
             self.params['mode'] = 'check_settings'
