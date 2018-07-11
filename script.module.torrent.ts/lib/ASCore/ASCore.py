@@ -903,6 +903,14 @@ class _TSServ(threading.Thread):
                 self.err = True
         elif cmd == 'START':
             try:
+                #if len(params) > 1:
+                #    response = urllib2.urlopen(urllib2.unquote(params[0].split('=')[1]))
+                #    playlist = response.read()
+                #    playlist = re.sub('#.*?\n', '', playlist).splitlines()
+                #    fileindex = int(params[1].split('=')[1])
+                #    self.content_url = playlist[fileindex]
+                #    self.push('START INFOHASH %s %d 0 0 0' % (params[3], fileindex))
+                #else:
                 self.content_url = urllib2.unquote(params[0].split('=')[1])
             except:
                 self.content_url = params[0]

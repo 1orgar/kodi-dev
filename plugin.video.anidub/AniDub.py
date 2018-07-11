@@ -76,6 +76,8 @@ class Main:
         self.url.sid_file = fs_enc(os.path.join(xbmc.translatePath('special://temp/'), 'anidub.sid'))
         self.url.download_dir = self.addon_data_dir
         self.url.cb_auth_ok = self._save_auth_setting
+        if self.params['mode'] == 'main' and self.params['param'] == '':
+            os.remove(self.url.sid_file)
         if not self.__settings__.getSetting("login") or not self.__settings__.getSetting("password"):
             show_message('Авторизация', 'Укажите логин и пароль')
             self.params['mode'] = 'check_settings'
@@ -437,8 +439,13 @@ class Main:
                                              soup.find(string='Дата выпуска: ').parent.parent.get_text()).group(1))
             except:
                 info['year'] = 0
-        try: info['rating'] = float(re.search(r'\d+.\d+', soup.find('div', class_='rcol').sup.b.get_text()).group()) * 2
-        except: info['rating'] = float(re.search(r'\d+', soup.find('div', class_='rcol').sup.b.get_text()).group()) * 2
+        try:
+            info['rating'] = float(re.search(r'\d+.\d+', soup.find('div', class_='rcol').sup.b.get_text()).group()) * 2
+        except:
+            try:
+                info['rating'] = float(re.search(r'\d+', soup.find('div', class_='rcol').sup.b.get_text()).group()) * 2
+            except:
+                info['rating'] = 0.0
         try: info['genre'] = soup.find('b', string=u'Жанр: ').next_sibling.get_text()
         except: info['genre'] = ''
         try: info['director'] = soup.find('b', string=u'Режиссер: ').next_sibling.get_text()
